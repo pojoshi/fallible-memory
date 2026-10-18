@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #e1e2e7;
+    --surface: #ffffff;
+    --surface-2: #eceef2;
+    --text: #343b58;
+    --text-dim: #5a6186;
+    --border: #cbcfdd;
+    --accent: #6a3fc0;
+    --accent-soft: #ece4fb;
+    --stale: #8f5e15;
+    --stale-soft: #faf0dd;
+    --contradicted: #8c4351;
+    --contradicted-soft: #fbe8ea;
+    --disputed: #34548a;
+    --disputed-soft: #e6edfa;
+    --revoked: #565c82;
+    --revoked-soft: #eceef4;
+    --on-accent: #ffffff;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: 'IBM Plex Sans', system-ui, sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1a1b26; --surface: #1f2335; --surface-2: #252a40; --text: #c0caf5; --text-dim: #8b92b8;
+      --border: #2f3454; --accent: #bb9af7; --accent-soft: #2d2550; --stale: #e0af68; --stale-soft: #3c3222;
+      --contradicted: #f7768e; --contradicted-soft: #3b2430; --disputed: #7aa2f7; --disputed-soft: #22294a;
+      --revoked: #8d94ba; --revoked-soft: #242842; --on-accent: #16161e; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1a1b26; --surface: #1f2335; --surface-2: #252a40; --text: #c0caf5; --text-dim: #8b92b8;
+    --border: #2f3454; --accent: #bb9af7; --accent-soft: #2d2550; --stale: #e0af68; --stale-soft: #3c3222;
+    --contradicted: #f7768e; --contradicted-soft: #3b2430; --disputed: #7aa2f7; --disputed-soft: #22294a;
+    --revoked: #8d94ba; --revoked-soft: #242842; --on-accent: #16161e; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--sans);
+    margin: 0; padding-inline: 16px; padding-block: 20px 40px;
+    max-width: 1240px; margin-inline: auto;
+  }
+  h1, h2, h3 { font-family: var(--mono); font-weight: 600; text-wrap: balance; margin: 0; }
+  p { margin: 0; }
+  .eyebrow { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); }
+
+  header.page { display: flex; flex-direction: column; gap: 6px; padding-block-end: 18px; border-bottom: 1px solid var(--border); margin-bottom: 22px; }
+  header.page h1 { font-size: 22px; }
+  header.page .sub { color: var(--text-dim); font-size: 14px; max-width: 70ch; line-height: 1.5; }
+
+  .clock-bar { margin-top: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .clock-bar label { font-family: var(--mono); font-size: 12.5px; color: var(--text-dim); white-space: nowrap; }
+  .clock-bar input[type=range] { flex: 1; min-width: 140px; accent-color: var(--accent); }
+  .day-readout { font-family: var(--mono); font-weight: 600; font-size: 14px; background: var(--accent-soft); color: var(--accent); padding: 3px 10px; border-radius: 999px; min-width: 84px; text-align: center; }
+
+  .grid { display: grid; grid-template-columns: 270px 1fr 330px; gap: 16px; align-items: start; }
+  @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .panel h2 { font-size: 13px; letter-spacing: 0.04em; }
+  .panel .hint { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; }
+
+  label.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-dim); font-family: var(--mono); }
+  input[type=text], select {
+    font-family: var(--sans); font-size: 13.5px; padding: 7px 9px; border-radius: 7px;
+    border: 1px solid var(--border); background: var(--surface-2); color: var(--text); width: 100%;
+  }
+  input[type=text]:focus, select:focus, button:focus-visible, input[type=range]:focus-visible, input[type=checkbox]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  button {
+    font-family: var(--sans); font-weight: 600; font-size: 13px; padding: 8px 12px; border-radius: 7px;
+    border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--text); border-color: var(--border); font-weight: 500; text-align: left; }
+  button.small { padding: 4px 8px; font-size: 11.5px; border-radius: 6px; }
+  button.danger-outline { background: transparent; color: var(--contradicted); border-color: var(--contradicted); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .stack { display: flex; flex-direction: column; gap: 8px; }
+  .last-result { border-radius: 8px; padding: 8px 10px; font-size: 12.5px; line-height: 1.5; background: var(--surface-2); color: var(--text-dim); }
+  .last-result.created, .last-result.reconfirmed, .last-result.superseded { background: var(--accent-soft); color: var(--accent); }
+  .last-result.disputed { background: var(--disputed-soft); color: var(--disputed); }
+  .last-result.rejected { background: var(--contradicted-soft); color: var(--contradicted); }
+
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--text-dim); }
+  .toolbar select { width: auto; }
+  .toolbar label.inline { display: flex; align-items: center; gap: 6px; }
+
+  .fact-list { display: flex; flex-direction: column; gap: 8px; max-height: 620px; overflow-y: auto; padding-right: 2px; }
+  .fact-card { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 6px; }
+  .fact-card.status-contradicted { opacity: 0.7; }
+  .fact-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .fact-key { font-family: var(--mono); font-size: 12px; color: var(--text-dim); overflow-wrap: anywhere; }
+  .fact-value { font-size: 14.5px; font-weight: 600; overflow-wrap: anywhere; }
+  .fact-value.strike { text-decoration: line-through; text-decoration-color: var(--text-dim); }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+  .pill { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--revoked-soft); color: var(--revoked); }
+  .pill.active, .pill.assert { background: var(--accent-soft); color: var(--accent); }
+  .pill.stale, .pill.hedge { background: var(--stale-soft); color: var(--stale); }
+  .pill.contradicted, .pill.withheld, .pill.sensitive { background: var(--contradicted-soft); color: var(--contradicted); }
+  .pill.disputed, .pill.ask { background: var(--disputed-soft); color: var(--disputed); }
+  .pill.scope { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); }
+
+  .meter-row { display: flex; align-items: center; gap: 8px; }
+  .meter { flex: 1; height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
+  .meter > span { display: block; height: 100%; background: var(--accent); }
+  .meter-num { font-family: var(--mono); font-size: 11px; color: var(--text-dim); min-width: 34px; text-align: right; }
+  .fact-meta { font-size: 11.5px; color: var(--text-dim); display: flex; gap: 10px; flex-wrap: wrap; }
+  .fact-actions { display: flex; gap: 6px; }
+  .empty { color: var(--text-dim); font-style: italic; font-size: 13px; }
+  .tomb { font-size: 12px; color: var(--text-dim); border-top: 1px dashed var(--border); padding-top: 10px; line-height: 1.5; }
+
+  .answer { border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; }
+  .answer .says { font-size: 15px; line-height: 1.5; font-weight: 600; }
+  .answer .evidence { font-size: 12px; color: var(--text-dim); line-height: 1.5; font-family: var(--mono); }
+  .answer .actions { display: flex; flex-direction: column; gap: 6px; }
+  .answer .correct { display: flex; gap: 6px; }
+
+  .log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+  .log li { display: flex; gap: 8px; align-items: baseline; line-height: 1.5; }
+  .log .d { font-family: var(--mono); color: var(--text-dim); min-width: 52px; }
+
+  section.legend { margin-top: 22px; display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--text-dim); align-items: center; }
+  footer.note { margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim); line-height: 1.6; max-width: 90ch; }
+  footer.note code { font-family: var(--mono); background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+
+<header class="page">
+  <div class="eyebrow">Fallible Memory / browser playground</div>
+  <h1>Memory Console</h1>
+  <p class="sub">Every fact carries a source, a confidence, a freshness window, a scope and a sensitivity. Drag the clock, teach it something that disagrees, ask the assistant, or tell it to forget. Everything here runs the same engine the tests cover.</p>
+
+  <div class="clock-bar">
+    <label for="dayRange">Simulated day (stands in for elapsed time)</label>
+    <input type="range" id="dayRange" min="0" max="90" value="14">
+    <span class="day-readout" id="dayReadout">Day 14</span>
+  </div>
+</header>
+
+<div class="grid">
+  <!-- Teach -->
+  <div class="panel">
+    <h2>Teach the memory</h2>
+    <p class="hint">Writes happen on the simulated day above. A new value in an occupied slot is compared against what is already believed, and the outcome is shown below.</p>
+
+    <div class="stack">
+      <label class="field">Scope (who or what it applies to)
+        <select id="fScope">
+          <option value="user">user</option>
+          <option value="project:atlas">project:atlas</option>
+          <option value="shared">shared</option>
+        </select>
+      </label>
+      <div class="row2">
+        <label class="field">Subject<input type="text" id="fSubject" value="user"></label>
+        <label class="field">Predicate<input type="text" id="fPredicate" value="employer"></label>
+      </div>
+      <label class="field">Value<input type="text" id="fValue" placeholder="e.g. Initech"></label>
+      <div class="row2">
+        <label class="field">Source
+          <select id="fSource">
+            <option value="stated">stated (user said it)</option>
+            <option value="tool_output">tool_output</option>
+            <option value="inferred">inferred</option>
+          </select>
+        </label>
+        <label class="field">Volatility
+          <select id="fVol">
+            <option value="durable">durable</option>
+            <option value="volatile">volatile</option>
+          </select>
+        </label>
+      </div>
+      <label class="field">Sensitivity (auto-raised for risky predicates)
+        <select id="fSens">
+          <option value="auto">auto</option>
+          <option value="sensitive">sensitive</option>
+        </select>
+      </label>
+      <button id="writeBtn">Write fact</button>
+    </div>
+
+    <div class="last-result" id="lastResult" role="status" aria-live="polite">Nothing written yet in this session.</div>
+
+    <div class="stack">
+      <p class="hint">Or try a failure scenario:</p>
+      <button class="secondary small" id="scContradict">User says: "I moved to Initech" (contradiction)</button>
+      <button class="secondary small" id="scGuess">Assistant guesses employer is "Hooli" (weak vs strong)</button>
+      <button class="secondary small" id="scTool">Tool reports project deadline is Nov 3</button>
+      <button class="secondary small" id="scSensitive">Assistant infers a medical condition (privacy)</button>
+      <button class="secondary small" id="resetBtn">Reset demo</button>
+    </div>
+  </div>
+
+  <!-- Inspector -->
+  <div class="panel">
+    <h2>What I remember about you</h2>
+    <p class="hint">The memory inspector. Contradicted history stays visible only as an audit trail. Forgetting erases the values for good.</p>
+    <div class="toolbar">
+      <label class="inline">Scope
+        <select id="filterScope" aria-label="Filter by scope">
+          <option value="all">all</option>
+          <option value="user">user</option>
+          <option value="project:atlas">project:atlas</option>
+          <option value="shared">shared</option>
+        </select>
+      </label>
+      <label class="inline"><input type="checkbox" id="showHistory"> show history</label>
+      <button class="danger-outline small" id="forgetScopeBtn" disabled>Forget everything in this scope</button>
+    </div>
+    <div class="fact-list" id="factList"></div>
+    <div class="tomb" id="tomb"></div>
+  </div>
+
+  <!-- Ask -->
+  <div class="panel">
+    <h2>Ask the assistant</h2>
+    <p class="hint">The same memory produces an answer, a hedge, or a question, depending on how much it should trust what it has. Change who is asking to see scope and sensitivity at work.</p>
+    <label class="field">Asking as
+      <select id="ctxSelect"></select>
+    </label>
+    <label class="field">About
+      <select id="askSelect"></select>
+    </label>
+    <button id="askBtn">Ask</button>
+    <div class="answer" id="answer" aria-live="polite"><p class="empty">Pick a question and hit Ask.</p></div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:16px">
+  <h2>Activity</h2>
+  <ul class="log" id="log"></ul>
+</div>
+
+<section class="legend">
+  <span class="pill active">active</span> trusted and in date
+  <span class="pill stale">stale</span> past its freshness window, decaying
+  <span class="pill disputed">disputed</span> a weaker claim disagrees
+  <span class="pill contradicted">contradicted</span> retired, kept for audit
+  <span class="pill sensitive">sensitive</span> only stated, never inferred
+</section>
+
+<footer class="note">
+  This page inlines the engine from <code>src/</code> at build time (<code>npm run build:demo</code>), so what you see is what the tests exercise.
+  State is saved in this browser's local storage so a refresh does not wipe it; "Reset demo" restores the seed. No data leaves the page.
+  Architecture and the full failure-test walkthrough are in <code>docs/ARCHITECTURE.md</code> and <code>docs/FAILURE_TESTS.md</code>.
+</footer>
+
+<script>
+/*__ENGINE_BUNDLE__*/
+</script>
+<script>
+(function () {
+  "use strict";
+  var L = window.MemoryLib;
+  var STORE_KEY = "mkw-demo-v1";
+
+  var CONTEXTS = {
+    assistant: { label: "Your assistant (no sensitive facts)", ctx: { scopes: ["user", "project:atlas", "shared"], includeSensitive: false } },
+    bot: { label: "Project bot (project:atlas and shared only)", ctx: { scopes: ["project:atlas", "shared"], includeSensitive: false } },
+    you: { label: "You, asking directly (everything)", ctx: { includeSensitive: true } }
+  };
+
+  var engine, day, log, filterScope = "all", showHistory = false;
+
+  // ---------- helpers ----------
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function pill(text, cls) { return el("span", "pill " + cls, text); }
+  function slotLabel(f) { return f.scope + " / " + f.subject + " → " + f.predicate; }
+
+  // ---------- state ----------
+  function seed() {
+    engine = new L.MemoryEngine();
+    day = 14;
+    log = [];
+    engine.write({ scope: "user", subject: "user", predicate: "employer", value: "Acme Robotics", sourceType: "stated", now: 0 });
+    engine.write({ scope: "user", subject: "user", predicate: "employer", value: "Globex Corp", sourceType: "stated", now: 12 });
+    engine.write({ scope: "project:atlas", subject: "project", predicate: "deadline", value: "Oct 10", sourceType: "inferred", volatility: "volatile", now: 0 });
+    engine.write({ scope: "shared", subject: "team", predicate: "timezone", value: "Europe/Lisbon", sourceType: "stated", now: 0 });
+    engine.write({ scope: "user", subject: "user", predicate: "home_address", value: "12 Palm Road", sourceType: "stated", now: 0 });
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify({ v: 1, day: day, log: log.slice(0, 30), engine: engine.toJSON() }));
+    } catch (e) { /* storage unavailable: the demo still works, it just will not persist */ }
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return false;
+      var s = JSON.parse(raw);
+      if (!s || s.v !== 1 || typeof s.day !== "number") return false;
+      engine = L.MemoryEngine.fromJSON(s.engine);
+      day = Math.max(0, Math.min(90, s.day));
+      log = Array.isArray(s.log) ? s.log : [];
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function addLog(kind, text, slot) {
+    log.unshift({ day: day, kind: kind, text: text, slot: slot || null });
+    if (log.length > 30) log.length = 30;
+  }
+
+  // Log lines quote values, so forgetting must scrub them too, or "erased" would be a lie.
+  function norm(x) { return String(x).trim().toLowerCase(); }
+  function scrubLog(scope, predicate) {
+    log = log.filter(function (e) {
+      if (!e.slot) return true;
+      if (norm(e.slot.scope) !== norm(scope)) return true;
+      return predicate != null && norm(e.slot.predicate) !== norm(predicate);
+    });
+  }
+  function resetResultBox(text) {
+    var box = $("lastResult");
+    box.className = "last-result";
+    box.textContent = text;
+  }
+
+  // ---------- writing ----------
+  function describeWrite(res, input) {
+    var what = '"' + input.value + '" for ' + input.scope + " / " + input.predicate;
+    switch (res.outcome) {
+      case "created": return { kind: "created", text: "Stored " + what + " (" + input.sourceType + ")." };
+      case "reconfirmed": return { kind: "reconfirmed", text: "Reconfirmed " + what + ": freshness reset, no duplicate created." };
+      case "superseded": return { kind: "superseded", text: "Superseded: " + what + " replaced \"" + res.contradicted.value + "\", which is kept as history." };
+      case "disputed": return { kind: "disputed", text: "Disputed: " + what + " is weaker than \"" + res.against.value + "\", so it was recorded as a competing claim, not an overwrite." };
+      default: return { kind: "rejected", text: "Rejected: " + res.reason };
+    }
+  }
+
+  function doWrite(input) {
+    input.now = day;
+    var res = engine.write(input);
+    var d = describeWrite(res, input);
+    addLog(d.kind, d.text, { scope: input.scope, predicate: input.predicate });
+    var box = $("lastResult");
+    box.className = "last-result " + d.kind;
+    box.textContent = d.text;
+    commit();
+    return res;
+  }
+
+  function commit() { save(); renderAll(); }
+
+  // ---------- rendering: inspector ----------
+  function renderFacts() {
+    var ctx = filterScope === "all" ? undefined : { scopes: [filterScope] };
+    var entries = engine.list({ now: day, ctx: ctx, includeHistory: showHistory });
+    var host = $("factList");
+    host.textContent = "";
+    if (entries.length === 0) {
+      host.appendChild(el("p", "empty", "Nothing remembered here."));
+    }
+    entries.forEach(function (e) {
+      var f = e.fact;
+      var card = el("div", "fact-card status-" + e.effectiveStatus);
+
+      var top = el("div", "fact-top");
+      var left = el("div");
+      left.appendChild(el("div", "fact-key", f.subject + " → " + f.predicate));
+      left.appendChild(el("div", "fact-value" + (e.effectiveStatus === "contradicted" ? " strike" : ""), f.value));
+      var tags = el("div", "tags");
+      tags.appendChild(pill(f.scope, "scope"));
+      if (f.sensitivity === "sensitive") tags.appendChild(pill("sensitive", "sensitive"));
+      tags.appendChild(pill(e.effectiveStatus, e.effectiveStatus));
+      top.appendChild(left);
+      top.appendChild(tags);
+      card.appendChild(top);
+
+      var row = el("div", "meter-row");
+      var meter = el("div", "meter");
+      var span = el("span");
+      span.style.width = e.displayConfidence + "%";
+      if (e.effectiveStatus === "stale") span.style.background = "var(--stale)";
+      if (e.effectiveStatus === "disputed") span.style.background = "var(--disputed)";
+      if (e.effectiveStatus === "contradicted") span.style.background = "var(--contradicted)";
+      meter.appendChild(span);
+      row.appendChild(meter);
+      row.appendChild(el("span", "meter-num", e.displayConfidence + "%"));
+      card.appendChild(row);
+
+      var meta = el("div", "fact-meta");
+      var bits = ["source: " + f.sourceType, f.volatility, "written day " + f.createdAt, "confirmed day " + f.lastConfirmedAt, "fresh for " + f.ttl + "d"];
+      if (f.supersedes) bits.push("replaced " + f.supersedes);
+      if (f.disputes) bits.push("disagrees with " + f.disputes);
+      if (f.retiredAt != null) bits.push("retired day " + f.retiredAt + " (" + f.retiredReason + ")");
+      bits.forEach(function (b) { meta.appendChild(el("span", null, b)); });
+      card.appendChild(meta);
+
+      if (e.effectiveStatus !== "contradicted") {
+        var actions = el("div", "fact-actions");
+        var btn = el("button", "small danger-outline", "Forget this");
+        btn.addEventListener("click", function () {
+          var r = engine.revoke({ scope: f.scope, subject: f.subject, predicate: f.predicate, now: day });
+          scrubLog(f.scope, f.predicate);
+          resetResultBox("Forgotten. Values erased, including from the activity log.");
+          addLog("forgot", "Forgot " + slotLabel(f) + ": " + r.removed + " record(s) erased, history included. Only a one-way marker remains.");
+          commit();
+        });
+        actions.appendChild(btn);
+        card.appendChild(actions);
+      }
+      host.appendChild(card);
+    });
+
+    var n = engine.tombstoneCount();
+    $("tomb").textContent = n === 0
+      ? "Nothing has been forgotten yet."
+      : n + " slot(s) forgotten. The values are erased from storage; only a one-way marker remains, so inference or a tool cannot quietly re-learn them. Only you stating it again lifts it.";
+    $("forgetScopeBtn").disabled = filterScope === "all";
+  }
+
+  // ---------- rendering: ask ----------
+  function renderContextOptions() {
+    var sel = $("ctxSelect");
+    if (sel.options.length) return;
+    Object.keys(CONTEXTS).forEach(function (k) {
+      var o = el("option", null, CONTEXTS[k].label);
+      o.value = k;
+      sel.appendChild(o);
+    });
+  }
+
+  function renderAskOptions() {
+    var sel = $("askSelect");
+    var prev = sel.value;
+    sel.textContent = "";
+    var seen = {};
+    engine.getAll().forEach(function (f) {
+      var key = JSON.stringify([f.scope, f.subject, f.predicate]);
+      if (seen[key]) return;
+      seen[key] = true;
+      var o = el("option", null, slotLabel(f));
+      o.value = key;
+      sel.appendChild(o);
+    });
+    if (prev) {
+      for (var i = 0; i < sel.options.length; i++) if (sel.options[i].value === prev) sel.value = prev;
+    }
+  }
+
+  function renderAnswer() {
+    var host = $("answer");
+    host.textContent = "";
+    var raw = $("askSelect").value;
+    if (!raw) { host.appendChild(el("p", "empty", "Nothing to ask about yet. Teach the memory something first.")); return; }
+    var parts = JSON.parse(raw);
+    var slot = { scope: parts[0], subject: parts[1], predicate: parts[2] };
+    var a = L.ask(engine, slot, day, CONTEXTS[$("ctxSelect").value].ctx);
+
+    var head = el("div", "fact-top");
+    head.appendChild(el("div", "fact-key", slotLabel({ scope: slot.scope, subject: slot.subject, predicate: slot.predicate })));
+    head.appendChild(pill(a.mode, a.mode));
+    host.appendChild(head);
+    host.appendChild(el("div", "says", a.text));
+
+    if (a.confidence != null) {
+      var row = el("div", "meter-row");
+      var meter = el("div", "meter");
+      var span = el("span");
+      span.style.width = a.confidence + "%";
+      if (a.mode === "hedge") span.style.background = "var(--stale)";
+      if (a.mode === "ask") span.style.background = "var(--disputed)";
+      meter.appendChild(span);
+      row.appendChild(meter);
+      row.appendChild(el("span", "meter-num", a.confidence + "%"));
+      host.appendChild(row);
+    }
+    if (a.evidence) host.appendChild(el("div", "evidence", a.evidence));
+
+    var fact = a.factId ? engine.getAll().filter(function (f) { return f.id === a.factId; })[0] : null;
+    function stateAs(value) {
+      doWrite({ scope: fact.scope, subject: fact.subject, predicate: fact.predicate, value: value, sourceType: "stated", volatility: fact.volatility });
+    }
+
+    if (fact && a.options.length) {
+      var actions = el("div", "actions");
+      a.options.forEach(function (opt) {
+        var b = el("button", "secondary small", opt.label);
+        b.addEventListener("click", function () { stateAs(opt.value); });
+        actions.appendChild(b);
+      });
+      host.appendChild(actions);
+    }
+    if (fact && (a.mode === "ask" || a.mode === "hedge")) {
+      var correct = el("div", "correct");
+      var input = el("input");
+      input.type = "text";
+      input.placeholder = "Or give the right value";
+      input.setAttribute("aria-label", "Correct value");
+      var go = el("button", "small", "Correct it");
+      go.addEventListener("click", function () {
+        if (input.value.trim()) stateAs(input.value.trim());
+      });
+      correct.appendChild(input);
+      correct.appendChild(go);
+      host.appendChild(correct);
+    }
+  }
+
+  function renderLog() {
+    var ul = $("log");
+    ul.textContent = "";
+    if (!log.length) { ul.appendChild(el("li", "empty", "No activity yet.")); return; }
+    log.slice(0, 10).forEach(function (e) {
+      var li = el("li");
+      li.appendChild(el("span", "d", "day " + e.day));
+      li.appendChild(pill(e.kind, e.kind === "forgot" ? "contradicted" : e.kind));
+      li.appendChild(el("span", null, e.text));
+      ul.appendChild(li);
+    });
+  }
+
+  function renderAll() {
+    $("dayReadout").textContent = "Day " + day;
+    $("dayRange").value = day;
+    renderFacts();
+    renderContextOptions();
+    renderAskOptions();
+    renderAnswer();
+    renderLog();
+  }
+
+  // ---------- wiring ----------
+  $("dayRange").addEventListener("input", function () {
+    day = parseInt($("dayRange").value, 10);
+    save();
+    renderAll();
+  });
+
+  $("writeBtn").addEventListener("click", function () {
+    var value = $("fValue").value.trim();
+    if (!value) { $("fValue").focus(); return; }
+    var sens = $("fSens").value;
+    doWrite({
+      scope: $("fScope").value,
+      subject: $("fSubject").value,
+      predicate: $("fPredicate").value,
+      value: value,
+      sourceType: $("fSource").value,
+      volatility: $("fVol").value,
+      sensitivity: sens === "sensitive" ? "sensitive" : undefined
+    });
+    $("fValue").value = "";
+  });
+
+  $("scContradict").addEventListener("click", function () {
+    doWrite({ scope: "user", subject: "user", predicate: "employer", value: "Initech", sourceType: "stated" });
+  });
+  $("scGuess").addEventListener("click", function () {
+    doWrite({ scope: "user", subject: "user", predicate: "employer", value: "Hooli", sourceType: "inferred" });
+  });
+  $("scTool").addEventListener("click", function () {
+    doWrite({ scope: "project:atlas", subject: "project", predicate: "deadline", value: "Nov 3", sourceType: "tool_output", volatility: "volatile" });
+  });
+  $("scSensitive").addEventListener("click", function () {
+    doWrite({ scope: "user", subject: "user", predicate: "medical_condition", value: "knee injury", sourceType: "inferred" });
+  });
+  $("resetBtn").addEventListener("click", function () {
+    seed();
+    resetResultBox("Demo reset to the seed data.");
+    commit();
+  });
+
+  $("filterScope").addEventListener("change", function () { filterScope = $("filterScope").value; renderAll(); });
+  $("showHistory").addEventListener("change", function () { showHistory = $("showHistory").checked; renderAll(); });
+  $("forgetScopeBtn").addEventListener("click", function () {
+    if (filterScope === "all") return;
+    if (!window.confirm("Erase everything remembered in scope \"" + filterScope + "\"? This cannot be undone.")) return;
+    var r = engine.forgetScope(filterScope, day);
+    scrubLog(filterScope, null);
+    resetResultBox("Forgotten. Values erased, including from the activity log.");
+    addLog("forgot", "Forgot everything in scope " + filterScope + ": " + r.removed + " record(s) erased.");
+    commit();
+  });
+
+  $("askBtn").addEventListener("click", renderAnswer);
+  $("askSelect").addEventListener("change", renderAnswer);
+  $("ctxSelect").addEventListener("change", renderAnswer);
+
+  if (!load()) seed();
+  renderAll();
+})();
+</script>
+</body>
+</html>

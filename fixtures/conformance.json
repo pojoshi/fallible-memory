@@ -1,0 +1,87 @@
+{
+  "description": "Behaviour that the Python service and the TypeScript playground must agree on. Days are integers (day 0 = base date). Only exact-slot behaviour is covered, because the playground has no semantic slot matching.",
+  "scenarios": [
+    {
+      "name": "contradiction: a newer stated fact supersedes, old one kept for audit",
+      "steps": [
+        {"op": "write", "day": 0, "subject": "user", "predicate": "employer", "value": "Acme Robotics", "source": "stated", "expect": {"outcome": "created"}},
+        {"op": "write", "day": 30, "subject": "user", "predicate": "employer", "value": "Globex", "source": "stated", "expect": {"outcome": "superseded", "contradictedValue": "Acme Robotics"}},
+        {"op": "ask", "day": 31, "subject": "user", "predicate": "employer", "expect": {"mode": "assert", "value": "Globex", "textContains": ["Globex", "it used to be \"Acme Robotics\""]}},
+        {"op": "check", "factCount": 2}
+      ]
+    },
+    {
+      "name": "stale: volatile facts expire and the agent asks instead of asserting",
+      "steps": [
+        {"op": "write", "day": 0, "subject": "user", "predicate": "current_project", "value": "Atlas", "source": "stated", "volatility": "volatile", "expect": {"outcome": "created"}},
+        {"op": "ask", "day": 10, "subject": "user", "predicate": "current_project", "expect": {"mode": "assert", "value": "Atlas", "confidence": 90}},
+        {"op": "ask", "day": 40, "subject": "user", "predicate": "current_project", "expect": {"mode": "ask", "value": "Atlas", "confidence": 52, "textContains": ["haven't confirmed", "Is that still right?"]}},
+        {"op": "write", "day": 41, "subject": "user", "predicate": "current_project", "value": "Atlas", "source": "stated", "expect": {"outcome": "reconfirmed"}},
+        {"op": "ask", "day": 42, "subject": "user", "predicate": "current_project", "expect": {"mode": "assert", "value": "Atlas"}}
+      ]
+    },
+    {
+      "name": "dispute: a weak inference never overwrites something the user said",
+      "steps": [
+        {"op": "write", "day": 0, "subject": "user", "predicate": "employer", "value": "Acme Robotics", "source": "stated", "expect": {"outcome": "created"}},
+        {"op": "write", "day": 3, "subject": "user", "predicate": "employer", "value": "Hooli", "source": "inferred", "expect": {"outcome": "disputed", "againstValue": "Acme Robotics"}},
+        {"op": "ask", "day": 4, "subject": "user", "predicate": "employer", "expect": {"mode": "ask", "value": "Acme Robotics", "textContains": ["two conflicting answers", "leaning towards \"Acme Robotics\""], "optionValues": ["Acme Robotics", "Hooli"]}},
+        {"op": "write", "day": 5, "subject": "user", "predicate": "employer", "value": "Acme Robotics", "source": "stated", "expect": {"outcome": "reconfirmed"}},
+        {"op": "ask", "day": 6, "subject": "user", "predicate": "employer", "expect": {"mode": "assert", "value": "Acme Robotics"}}
+      ]
+    },
+    {
+      "name": "privacy: revoke erases values, leaves only a tombstone, blocks re-learning",
+      "steps": [
+        {"op": "write", "day": 0, "subject": "user", "predicate": "employer", "value": "SecretCorp", "source": "stated", "expect": {"outcome": "created"}},
+        {"op": "write", "day": 2, "subject": "user", "predicate": "employer", "value": "OtherCorp", "source": "stated", "expect": {"outcome": "superseded"}},
+        {"op": "revoke", "day": 3, "subject": "user", "predicate": "employer", "expect": {"removed": 2}},
+        {"op": "check", "factCount": 0, "tombstones": 1, "storeLacks": ["SecretCorp", "OtherCorp"]},
+        {"op": "ask", "day": 4, "subject": "user", "predicate": "employer", "expect": {"mode": "unknown", "text": "I don't have anything on that."}},
+        {"op": "write", "day": 5, "subject": "user", "predicate": "employer", "value": "SecretCorp", "source": "inferred", "expect": {"outcome": "rejected"}},
+        {"op": "write", "day": 5, "subject": "user", "predicate": "employer", "value": "SecretCorp", "source": "tool_output", "expect": {"outcome": "rejected"}},
+        {"op": "write", "day": 6, "subject": "user", "predicate": "employer", "value": "NewCorp", "source": "stated", "expect": {"outcome": "created"}},
+        {"op": "check", "tombstones": 0}
+      ]
+    },
+    {
+      "name": "privacy: sensitive facts cannot be inferred and are withheld from restricted requesters",
+      "steps": [
+        {"op": "write", "day": 0, "subject": "user", "predicate": "medical_condition", "value": "asthma", "source": "inferred", "expect": {"outcome": "rejected"}},
+        {"op": "write", "day": 0, "subject": "user", "predicate": "medical_condition", "value": "asthma", "source": "stated", "expect": {"outcome": "created"}},
+        {"op": "ask", "day": 1, "subject": "user", "predicate": "medical_condition", "ctx": {"scopes": ["user"], "includeSensitive": false}, "expect": {"mode": "withheld", "value": null}},
+        {"op": "ask", "day": 1, "subject": "user", "predicate": "medical_condition", "ctx": {"includeSensitive": true}, "expect": {"mode": "assert", "value": "asthma"}}
+      ]
+    },
+    {
+      "name": "scope: a requester only sees the scopes it is given; forgetScope erases a scope",
+      "steps": [
+        {"op": "write", "day": 0, "scope": "project-x", "subject": "project", "predicate": "deadline", "value": "Friday", "source": "stated", "expect": {"outcome": "created"}},
+        {"op": "write", "day": 0, "subject": "user", "predicate": "employer", "value": "Acme Robotics", "source": "stated", "expect": {"outcome": "created"}},
+        {"op": "ask", "day": 1, "scope": "project-x", "subject": "project", "predicate": "deadline", "ctx": {"scopes": ["user"], "includeSensitive": false}, "expect": {"mode": "unknown"}},
+        {"op": "ask", "day": 1, "scope": "project-x", "subject": "project", "predicate": "deadline", "ctx": {"scopes": ["project-x"], "includeSensitive": false}, "expect": {"mode": "assert", "value": "Friday"}},
+        {"op": "forgetScope", "day": 2, "scope": "project-x", "expect": {"removed": 1}},
+        {"op": "check", "factCount": 1, "storeLacks": ["Friday"]},
+        {"op": "write", "day": 3, "scope": "project-x", "subject": "project", "predicate": "deadline", "value": "Monday", "source": "tool_output", "expect": {"outcome": "rejected"}}
+      ]
+    },
+    {
+      "name": "multi-valued slots keep each value independently",
+      "steps": [
+        {"op": "write", "day": 0, "subject": "user", "predicate": "languages", "value": "English", "source": "stated", "cardinality": "multi", "expect": {"outcome": "created"}},
+        {"op": "write", "day": 0, "subject": "user", "predicate": "languages", "value": "Hindi", "source": "stated", "cardinality": "multi", "expect": {"outcome": "created"}},
+        {"op": "revoke", "day": 1, "subject": "user", "predicate": "languages", "value": "Hindi", "expect": {"removed": 1}},
+        {"op": "check", "factCount": 1, "storeLacks": ["Hindi"]}
+      ]
+    },
+    {
+      "name": "source upgrade: the user confirming an inference turns it into a stated fact",
+      "steps": [
+        {"op": "write", "day": 0, "subject": "user", "predicate": "city", "value": "Manama", "source": "inferred", "expect": {"outcome": "created"}},
+        {"op": "ask", "day": 1, "subject": "user", "predicate": "city", "expect": {"mode": "hedge", "confidence": 50, "textContains": ["I inferred this"]}},
+        {"op": "write", "day": 2, "subject": "user", "predicate": "city", "value": "Manama", "source": "stated", "expect": {"outcome": "reconfirmed"}},
+        {"op": "ask", "day": 3, "subject": "user", "predicate": "city", "expect": {"mode": "assert", "confidence": 90, "textContains": ["Manama"]}}
+      ]
+    }
+  ]
+}

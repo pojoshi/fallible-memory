@@ -1,0 +1,33 @@
+# Postgres (with pgvector) + the API.   docker compose up --build
+# Set TOMBSTONE_KEY in .env (see .env.example).
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: fallible
+      POSTGRES_PASSWORD: fallible
+      POSTGRES_DB: fallible
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fallible"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://fallible:fallible@db:5432/fallible
+      TOMBSTONE_KEY: ${TOMBSTONE_KEY:?set TOMBSTONE_KEY in .env}
+      EMBEDDER: ${EMBEDDER:-hashing}
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:

@@ -1,0 +1,32 @@
+{
+  "note": "Free-text queries against a store holding these predicates (subject 'user'). 'expect' is the predicate that should rank first.",
+  "slots": ["employer", "home_city", "job_title", "phone_number", "email_address", "preferred_name", "favourite_language", "dietary_preference", "date_of_birth", "current_project", "timezone", "manager"],
+  "queries": [
+    {"q": "user employer", "expect": "employer", "category": "lexical"},
+    {"q": "employers", "expect": "employer", "category": "lexical"},
+    {"q": "home city", "expect": "home_city", "category": "lexical"},
+    {"q": "job title", "expect": "job_title", "category": "lexical"},
+    {"q": "phone number", "expect": "phone_number", "category": "lexical"},
+    {"q": "email address", "expect": "email_address", "category": "lexical"},
+    {"q": "preferred name", "expect": "preferred_name", "category": "lexical"},
+    {"q": "favorite language", "expect": "favourite_language", "category": "lexical"},
+    {"q": "dietary preference", "expect": "dietary_preference", "category": "lexical"},
+    {"q": "date of birth", "expect": "date_of_birth", "category": "lexical"},
+    {"q": "current project", "expect": "current_project", "category": "lexical"},
+    {"q": "time zone", "expect": "timezone", "category": "lexical"},
+    {"q": "emails", "expect": "email_address", "category": "partial"},
+    {"q": "project", "expect": "current_project", "category": "partial"},
+    {"q": "language", "expect": "favourite_language", "category": "partial"},
+    {"q": "birth", "expect": "date_of_birth", "category": "partial"},
+    {"q": "city", "expect": "home_city", "category": "partial"},
+    {"q": "title", "expect": "job_title", "category": "partial"},
+    {"q": "where do I work", "expect": "employer", "category": "paraphrase"},
+    {"q": "who is my boss", "expect": "manager", "category": "paraphrase"},
+    {"q": "what should I be called", "expect": "preferred_name", "category": "paraphrase"},
+    {"q": "where do I live", "expect": "home_city", "category": "paraphrase"},
+    {"q": "mobile", "expect": "phone_number", "category": "paraphrase"},
+    {"q": "what do I eat", "expect": "dietary_preference", "category": "paraphrase"},
+    {"q": "birthday", "expect": "date_of_birth", "category": "paraphrase"},
+    {"q": "role", "expect": "job_title", "category": "paraphrase"}
+  ]
+}

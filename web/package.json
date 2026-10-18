@@ -1,0 +1,23 @@
+{
+  "name": "fallible-memory-playground",
+  "version": "1.0.0",
+  "description": "Browser playground for fallible-memory: the core memory policy in TypeScript, with a self-contained demo page.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "scenarios": "esbuild scripts/scenarios.ts --bundle --platform=node --format=esm --outfile=dist/scenarios.mjs --log-level=warning && node dist/scenarios.mjs",
+    "build:demo": "node scripts/build-demo.mjs",
+    "check": "npm run typecheck && npm test && npm run build:demo && npm run check:demo",
+    "check:demo": "node scripts/check-demo.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
